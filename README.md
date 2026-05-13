@@ -3,7 +3,7 @@
 
 ---
 
-**Version:** 1.0 — May 2026  
+**Version:** 1.0   May 2026  
 **Focus Areas:** Prefill/Decode Disaggregation · GB200 / H200 / H100 Architectures · MoE & Dense Models · KV Cache Engineering · Production Serving Stacks
 
 ---
@@ -21,11 +21,11 @@
    - 3.3 [Configuration Trade-offs and Learnings](#33-configuration-trade-offs-and-learnings)
    - 3.4 [KV Cache Migration in Disaggregated Systems](#34-kv-cache-migration-in-disaggregated-systems)
 4. [Hardware Landscape](#4-hardware-landscape)
-   - 4.1 [NVIDIA H100 SXM5 — The Current Standard](#41-nvidia-h100-sxm5--the-current-standard)
-   - 4.2 [NVIDIA H200 — HBM3e and Memory Bandwidth Leap](#42-nvidia-h200--hbm3e-and-memory-bandwidth-leap)
-   - 4.3 [NVIDIA GB200 NVL72 — The Grace Blackwell Superchip](#43-nvidia-gb200-nvl72--the-grace-blackwell-superchip)
+   - 4.1 [NVIDIA H100 SXM5   The Current Standard](#41-nvidia-h100-sxm5--the-current-standard)
+   - 4.2 [NVIDIA H200   HBM3e and Memory Bandwidth Leap](#42-nvidia-h200--hbm3e-and-memory-bandwidth-leap)
+   - 4.3 [NVIDIA GB200 NVL72   The Grace Blackwell Superchip](#43-nvidia-gb200-nvl72--the-grace-blackwell-superchip)
    - 4.4 [Interconnect: NVLink, NVSwitch, and Infiniband](#44-interconnect-nvlink-nvswitch-and-infiniband)
-   - 4.5 [AMD MI300X — The Challenger](#45-amd-mi300x--the-challenger)
+   - 4.5 [AMD MI300X   The Challenger](#45-amd-mi300x--the-challenger)
 5. [Model Architectures Under the Serving Lens](#5-model-architectures-under-the-serving-lens)
    - 5.1 [Dense Transformer Models](#51-dense-transformer-models)
    - 5.2 [Mixture-of-Experts (MoE) Models](#52-mixture-of-experts-moe-models)
@@ -45,13 +45,13 @@
    - 8.3 [Block-Sparse Formats and Composable Attention](#83-block-sparse-formats-and-composable-attention)
    - 8.4 [Load-Balanced Dynamic Scheduling](#84-load-balanced-dynamic-scheduling)
 9. [Serving Engine Deep Dives](#9-serving-engine-deep-dives)
-   - 9.1 [vLLM — The Reference Implementation](#91-vllm--the-reference-implementation)
-   - 9.2 [SGLang — The Throughput Leader](#92-sglang--the-throughput-leader)
-   - 9.3 [NVIDIA TensorRT-LLM — Maximum Performance](#93-nvidia-tensorrt-llm--maximum-performance)
-   - 9.4 [llama.cpp — Portability Champion](#94-llamacpp--portability-champion)
-   - 9.5 [Triton Inference Server — Enterprise Orchestration](#95-triton-inference-server--enterprise-orchestration)
-   - 9.6 [Ray Serve — Distributed Serving Control Plane](#96-ray-serve--distributed-serving-control-plane)
-   - 9.7 [KubeAI — Kubernetes-Native Serving](#97-kubeai--kubernetes-native-serving)
+   - 9.1 [vLLM   The Reference Implementation](#91-vllm--the-reference-implementation)
+   - 9.2 [SGLang   The Throughput Leader](#92-sglang--the-throughput-leader)
+   - 9.3 [NVIDIA TensorRT-LLM   Maximum Performance](#93-nvidia-tensorrt-llm--maximum-performance)
+   - 9.4 [llama.cpp   Portability Champion](#94-llamacpp--portability-champion)
+   - 9.5 [Triton Inference Server   Enterprise Orchestration](#95-triton-inference-server--enterprise-orchestration)
+   - 9.6 [Ray Serve   Distributed Serving Control Plane](#96-ray-serve--distributed-serving-control-plane)
+   - 9.7 [KubeAI   Kubernetes-Native Serving](#97-kubeai--kubernetes-native-serving)
 10. [Scheduling, Batching, and Control Plane Design](#10-scheduling-batching-and-control-plane-design)
     - 10.1 [Continuous Batching (Orca)](#101-continuous-batching-orca)
     - 10.2 [Chunked Prefill and Stall Reduction](#102-chunked-prefill-and-stall-reduction)
@@ -81,17 +81,17 @@
 
 ## 1. Executive Summary
 
-The deployment of large language models (LLMs) at production scale has transformed from a research curiosity into the defining infrastructure challenge of the current AI era. Every organization serving LLMs at scale—from frontier labs to enterprise deployments—must navigate a growing matrix of hardware choices, serving architectures, model configurations, and optimization strategies.
+The deployment of large language models (LLMs) at production scale has transformed from a research curiosity into the defining infrastructure challenge of the current AI era. Every organization serving LLMs at scale from frontier labs to enterprise deployments must navigate a growing matrix of hardware choices, serving architectures, model configurations, and optimization strategies.
 
 This whitepaper dissects the **anatomy of inference serving** across four critical dimensions:
 
-**1. Configuration Architecture.** We examine the fundamental split between *aggregated* (Agg) serving—where prefill and decode run on the same GPU pool—and *disaggregated* (PD-Split or Disagg) serving—where prefill and decode are separated into dedicated pools. This architectural choice has profound implications for utilization, latency, throughput, and hardware cost, and has become the primary differentiation axis among leading serving frameworks in 2026.
+**1. Configuration Architecture.** We examine the fundamental split between *aggregated* (Agg) serving where prefill and decode run on the same GPU pool and *disaggregated* (PD-Split or Disagg) serving where prefill and decode are separated into dedicated pools. This architectural choice has profound implications for utilization, latency, throughput, and hardware cost, and has become the primary differentiation axis among leading serving frameworks in 2026.
 
 **2. Hardware Frontiers.** We profile the current generation of inference accelerators: NVIDIA H100 (the production workhorse), H200 (the memory-bandwidth optimized variant), and GB200/B200 (the Blackwell architecture with native FP4 support and dramatically expanded NVLink connectivity). We analyze how these hardware differences change optimal serving configurations and which model classes benefit most from each.
 
 **3. Model Architectures.** We contrast serving characteristics for dense transformer models (Llama 3, Phi-4, Qwen-3) against Mixture-of-Experts (MoE) models (Mixtral, DeepSeek-V3, Qwen-3-MoE), covering expert routing overhead, activation sparsity exploitation, and the expert parallelism strategies required at scale.
 
-**4. Framework Ecosystem.** We survey the open-source inference stack in depth—vLLM, SGLang, TensorRT-LLM, llama.cpp, FlashInfer, LMCache, Mooncake, Ray Serve, KubeAI, and Triton Inference Server—covering their design philosophies, performance characteristics, and operational trade-offs.
+**4. Framework Ecosystem.** We survey the open-source inference stack in depth vLLM, SGLang, TensorRT-LLM, llama.cpp, FlashInfer, LMCache, Mooncake, Ray Serve, KubeAI, and Triton Inference Server covering their design philosophies, performance characteristics, and operational trade-offs.
 
 **Key findings as of May 2026:**
 
@@ -193,13 +193,13 @@ This fundamental asymmetry between prefill (compute-bound) and decode (memory-bo
 
 | GPU | HBM Type | Memory BW | VRAM | FP16 TFLOP/s | FP8 TFLOP/s |
 |-----|----------|-----------|------|---------------|-------------|
-| A100 80GB SXM | HBM2e | 2,039 GB/s | 80 GB | 312 | — |
+| A100 80GB SXM | HBM2e | 2,039 GB/s | 80 GB | 312 |   |
 | H100 80GB SXM5 | HBM3 | 3,350 GB/s | 80 GB | 989 | 1,979 |
 | H200 141GB SXM | HBM3e | 4,800 GB/s | 141 GB | 989 | 1,979 |
 | B200 192GB SXM | HBM3e | 8,000 GB/s | 192 GB | 2,250 | 4,500 |
 | GB200 (Grace-Blackwell) | HBM3e | 8,000 GB/s | 192 GB | 2,250 | 4,500 |
 
-The H200's primary improvement over H100 is **43% more memory bandwidth** and **76% more VRAM**—both directly accelerating the decode phase. The GB200 doubles bandwidth again and adds native FP4 support.
+The H200's primary improvement over H100 is **43% more memory bandwidth** and **76% more VRAM** both directly accelerating the decode phase. The GB200 doubles bandwidth again and adds native FP4 support.
 
 ---
 
@@ -257,7 +257,7 @@ In the **disaggregated** configuration, dedicated GPU pools handle prefill and d
 - Prefill pool tuned for compute throughput (larger batch sizes, higher tensor parallelism)
 - Decode pool tuned for memory bandwidth and latency (smaller TP, more instances)
 - Each pool independently auto-scaled based on workload demand
-- KV cache must be transferred between pools — this is the primary engineering challenge
+- KV cache must be transferred between pools   this is the primary engineering challenge
 - Enables independent optimization of TTFT (prefill pool scaling) and TPOT (decode pool scaling)
 - Production users: SGLang (v0.5+), vLLM (V1 engine), AI-Dynamo, Mooncake (Kimi)
 
@@ -272,7 +272,7 @@ In the **disaggregated** configuration, dedicated GPU pools handle prefill and d
 
 **SGLang's Disaggregated Serving Findings (v0.5+):**
 
-SGLang introduced decode-side **radix cache reuse** for disaggregated serving — when multiple requests share KV prefix content, only one prefill is needed. In production at xAI, AMD, NVIDIA, LinkedIn, and Cursor:
+SGLang introduced decode-side **radix cache reuse** for disaggregated serving   when multiple requests share KV prefix content, only one prefill is needed. In production at xAI, AMD, NVIDIA, LinkedIn, and Cursor:
 
 - 85–95% cache hit rates for few-shot workloads vs. 15–25% in aggregated vLLM
 - 75–90% cache hits for multi-turn chat vs. 10–20% for vLLM
@@ -320,13 +320,13 @@ Prefill GPU ──────────────────────�
 | PCIe 5.0 × 16 | 64 GB/s | ~210 ms |
 | Ethernet 100 Gbps | 12.5 GB/s | ~1,072 ms |
 
-**The implication**: NVLink-based disaggregation (same-chassis GB200 NVL72) is essentially free. Cross-node disaggregation over InfiniBand requires careful prompt-length thresholding — short prompts should not be disaggregated (transfer overhead > compute savings).
+**The implication**: NVLink-based disaggregation (same-chassis GB200 NVL72) is essentially free. Cross-node disaggregation over InfiniBand requires careful prompt-length thresholding   short prompts should not be disaggregated (transfer overhead > compute savings).
 
 ---
 
 ## 4. Hardware Landscape
 
-### 4.1 NVIDIA H100 SXM5 — The Current Standard
+### 4.1 NVIDIA H100 SXM5   The Current Standard
 
 The H100 remains the deployment standard for 2025-2026 production LLM serving:
 
@@ -354,13 +354,13 @@ The H100 remains the deployment standard for 2025-2026 production LLM serving:
 
 **Key serving characteristics:**
 - **Hopper TMA (Tensor Memory Accelerator)**: Asynchronous memory copy bypasses L2 cache; enables FA3 (FlashAttention-3) with WGMMA + TMA pipeline
-- **FP8 support**: Hardware-accelerated 8-bit floating point at 2× the throughput of BF16 — critical for production throughput
+- **FP8 support**: Hardware-accelerated 8-bit floating point at 2× the throughput of BF16   critical for production throughput
 - **NVLink 4.0**: 8-GPU HGX nodes with 900 GB/s all-to-all bandwidth, enabling TP=8 with minimal latency
 - **Optimal workloads**: Dense models up to 70B at full precision, MoE models up to 671B with EP+TP parallelism
 
-### 4.2 NVIDIA H200 — HBM3e and Memory Bandwidth Leap
+### 4.2 NVIDIA H200   HBM3e and Memory Bandwidth Leap
 
-The H200 is H100 compute with HBM3e memory — a targeted upgrade for memory-bandwidth-bound workloads:
+The H200 is H100 compute with HBM3e memory   a targeted upgrade for memory-bandwidth-bound workloads:
 
 ```
 H100 vs H200 Comparison:
@@ -385,7 +385,7 @@ H100 vs H200 Comparison:
 
 **Optimal use cases:** Long-context workloads (RAG with large documents, multi-turn conversations, coding assistants with large codebases), high-batch decode serving where bandwidth is the bottleneck.
 
-### 4.3 NVIDIA GB200 NVL72 — The Grace Blackwell Superchip
+### 4.3 NVIDIA GB200 NVL72   The Grace Blackwell Superchip
 
 The GB200 represents a generational leap that fundamentally changes multi-GPU serving architectures:
 
@@ -426,7 +426,7 @@ The GB200 represents a generational leap that fundamentally changes multi-GPU se
 
 3. **Expert parallelism at scale**: For DeepSeek-V3 with 256 experts (8 active per token), EP=256 across 72 GPUs is feasible with NVLink eliminating all-to-all bottlenecks.
 
-4. **Grace CPU coherence**: The ARM Grace CPU with coherent NVLink-C2C connection to GPUs eliminates PCIe transfer overhead. KV cache migration between CPU DRAM and GPU HBM is 900 GB/s — comparable to older GPU-to-GPU NVLink.
+4. **Grace CPU coherence**: The ARM Grace CPU with coherent NVLink-C2C connection to GPUs eliminates PCIe transfer overhead. KV cache migration between CPU DRAM and GPU HBM is 900 GB/s   comparable to older GPU-to-GPU NVLink.
 
 **SGLang FP4 Results on GB200 (2026):**
 - FP4/FP8 quantization support across NVIDIA GB200/B300/H100
@@ -463,7 +463,7 @@ For TP=N across LLama 3 70B (4096-dim hidden, BF16):
 - 80 layers = ~2.8 ms AllReduce overhead per decode step
 - At TP=8 on H100 HGX: tolerable for batch serving, significant for single-stream latency
 
-### 4.5 AMD MI300X — The Challenger
+### 4.5 AMD MI300X   The Challenger
 
 The MI300X deserves mention as a serious alternative for inference serving:
 
@@ -527,11 +527,11 @@ Dense Model Inference Flow:
 | Variant | KV Cache Size | Notes |
 |---------|--------------|-------|
 | MHA (Multi-Head Attention) | H × D × L | Oldest, largest KV |
-| GQA (Grouped-Query Attention) | (H/G) × D × L | Llama 3, Qwen — G groups |
+| GQA (Grouped-Query Attention) | (H/G) × D × L | Llama 3, Qwen   G groups |
 | MQA (Multi-Query Attention) | 1 × D × L | Minimal KV, lower quality |
-| MLA (Multi-head Latent Attention) | compressed | DeepSeek V3 — C×d_c latent |
+| MLA (Multi-head Latent Attention) | compressed | DeepSeek V3   C×d_c latent |
 
-**MLA (Multi-Head Latent Attention in DeepSeek V3)** is particularly notable: by compressing the KV representation into a low-rank latent space, the KV cache for DeepSeek V3 is only ~5.7% of what MHA would require — enabling dramatically longer context and higher batch sizes.
+**MLA (Multi-Head Latent Attention in DeepSeek V3)** is particularly notable: by compressing the KV representation into a low-rank latent space, the KV cache for DeepSeek V3 is only ~5.7% of what MHA would require   enabling dramatically longer context and higher batch sizes.
 
 ### 5.2 Mixture-of-Experts (MoE) Models
 
@@ -574,9 +574,9 @@ MoE Layer Architecture:
 - **Memory efficiency**: With expert parallelism, MoE parameters are sharded across GPUs
 
 **MoE serving challenges:**
-- **Expert routing communication**: After routing, each token must reach its assigned expert's GPU — requiring AlltoAll collective operations
+- **Expert routing communication**: After routing, each token must reach its assigned expert's GPU   requiring AlltoAll collective operations
 - **Load imbalance**: Some experts may be hot (frequently selected) while others are cold; dynamic load balancing is critical
-- **Memory pressure**: All expert weights must be in GPU memory even if not active — for DeepSeek-V3 671B, this is ~1.3 TB just for FFN weights in BF16
+- **Memory pressure**: All expert weights must be in GPU memory even if not active   for DeepSeek-V3 671B, this is ~1.3 TB just for FFN weights in BF16
 
 ### 5.3 MoE Serving: Expert Parallelism and Load Balancing
 
@@ -598,9 +598,9 @@ Tokens routed to expert GPUs → computed → returned
 - Each token produces K routing decisions
 - AlltoAll volume = `batch × seq × K × hidden_dim × dtype_size`
 - On InfiniBand NDR: significant overhead, makes EP across nodes costly
-- On NVLink (GB200 NVL72): AlltoAll across 72 GPUs at 1,800 GB/s — feasible for real-time serving
+- On NVLink (GB200 NVL72): AlltoAll across 72 GPUs at 1,800 GB/s   feasible for real-time serving
 
-**SGLang's elastic expert parallel recovery (2026):** SGLang introduced fault-tolerant expert parallelism for large-scale MoE serving, allowing an expert group to recover from GPU failure without restarting the entire serving cluster — critical for 671B model deployments.
+**SGLang's elastic expert parallel recovery (2026):** SGLang introduced fault-tolerant expert parallelism for large-scale MoE serving, allowing an expert group to recover from GPU failure without restarting the entire serving cluster   critical for 671B model deployments.
 
 **Load balancing strategies:**
 
@@ -619,13 +619,13 @@ Multimodal models (LLaVA, Qwen-VL, Gemma 4 Vision) introduce additional serving 
 - **Separate vision encoder**: Additional GPU memory and compute for vision transformer backbone
 - **Chunked prefill for interleaved content**: TensorRT-LLM added chunked prefill for interleaved video/text layouts (reported by Inference Radar, May 2026)
 
-For production multimodal serving, the prefill phase is particularly expensive — a 2048×2048 image at 14-pixel patch size produces ~21K visual tokens before the text prompt even begins.
+For production multimodal serving, the prefill phase is particularly expensive   a 2048×2048 image at 14-pixel patch size produces ~21K visual tokens before the text prompt even begins.
 
 ---
 
 ## 6. KV Cache: The Central Resource
 
-The KV cache is simultaneously the most valuable and most constrained resource in LLM serving. Every architectural decision — from GPU selection to parallelism strategy to serving topology — is ultimately about managing the KV cache.
+The KV cache is simultaneously the most valuable and most constrained resource in LLM serving. Every architectural decision   from GPU selection to parallelism strategy to serving topology   is ultimately about managing the KV cache.
 
 ### 6.1 PagedAttention and the Virtual Memory Analogy
 
@@ -665,9 +665,9 @@ With PagedAttention:
 - Copy-on-write for beam search and speculative decoding
 
 **Limitations of PagedAttention (identified in vTensor research):**
-1. **Tightly coupled**: Paged KV structure couples memory management with compute kernels. Custom kernels must explicitly handle paged addressing — preventing use of standard GEMM libraries for attention.
+1. **Tightly coupled**: Paged KV structure couples memory management with compute kernels. Custom kernels must explicitly handle paged addressing   preventing use of standard GEMM libraries for attention.
 2. **Static pre-allocation**: vLLM pre-allocates ~83% of GPU memory for the KV cache pool at startup. This cannot be dynamically shared with other allocations.
-3. **Compute penalty**: Paged attention CUDA kernels cannot use Tensor Cores in all configurations — particularly for GQA/MQA variants (vTensor research shows vLLM achieving only 3.6 TFLOP/s vs. 27.3 TFLOP/s for MQA due to CUDA-core-only execution).
+3. **Compute penalty**: Paged attention CUDA kernels cannot use Tensor Cores in all configurations   particularly for GQA/MQA variants (vTensor research shows vLLM achieving only 3.6 TFLOP/s vs. 27.3 TFLOP/s for MQA due to CUDA-core-only execution).
 
 ### 6.2 Prefix Caching and RadixAttention
 
@@ -677,7 +677,7 @@ With PagedAttention:
 Request 1: [System Prompt | Document A | Question 1]
 Request 2: [System Prompt | Document A | Question 2]
                 ↑               ↑
-          Shared prefix — compute once, cache and reuse!
+          Shared prefix   compute once, cache and reuse!
 
 RadixAttention (SGLang) Tree:
                      Root
@@ -726,7 +726,7 @@ GPU Side:
 ```
 
 **vTensor advantages:**
-- GPU kernel sees a standard contiguous tensor pointer — no changes needed to compute kernels
+- GPU kernel sees a standard contiguous tensor pointer   no changes needed to compute kernels
 - Physical memory allocated only for tokens that exist (no pre-allocation bloat)
 - Frees ~71.25% (57 GB) of memory vs. vLLM on A100 80 GB
 - Enables Tensor Core utilization for GQA/MQA: **7.58× faster** for MQA vs. vLLM's paged attention
@@ -763,7 +763,7 @@ KV Cache: 1 × seq × d_head (H× reduction)
 
 **KV cache size comparison for Llama 3.1 70B (GQA-8) at 8K tokens, BF16:**
 - MHA equivalent: 80 layers × 64 heads × 128 dim × 8192 tokens × 2 bytes × 2 (K+V) = **167 GB**
-- Actual GQA-8: 80 × 8 × 128 × 8192 × 2 × 2 = **20.9 GB** — 8× reduction
+- Actual GQA-8: 80 × 8 × 128 × 8192 × 2 × 2 = **20.9 GB**   8× reduction
 - This is why GQA is now standard in all frontier dense models
 
 ---
@@ -927,7 +927,7 @@ FlashInfer System Architecture:
 
 **1. Block-Sparse Format for KV Heterogeneity:**
 PagedAttention's page tables, RadixAttention's radix tree, and tree-structured speculative decoding KV caches are all unified under Block-Sparse Row (BSR) format:
-- Adjustable block sizes `(B_r, B_c)` — from `(1,1)` (token-level) to `(128,128)` (page-level)
+- Adjustable block sizes `(B_r, B_c)`   from `(1,1)` (token-level) to `(128,128)` (page-level)
 - Composable formats: prefix KV in large-block sparse matrix + unique KV in small-block sparse matrix, combined in a single attention pass
 
 **2. JIT Compiler for Attention Variants:**
@@ -971,8 +971,8 @@ FlashInfer Solution (Stream-K inspired):
 ```
 Example: 12 requests, first 6 share prefix, last 6 share different prefix
 
-Shared prefix KV:        block size (3, 1) — 3 queries share KV via shared memory
-Unique suffix KV:        block size (1, 1) — each query accesses own KV
+Shared prefix KV:        block size (3, 1)   3 queries share KV via shared memory
+Unique suffix KV:        block size (1, 1)   each query accesses own KV
 
 Composite attention:
   output = attention(Q, KV_shared, block=(3,1)) ⊕ attention(Q, KV_unique, block=(1,1))
@@ -1017,7 +1017,7 @@ Key insight: plan() runs on CPU (not in graph),
 
 ## 9. Serving Engine Deep Dives
 
-### 9.1 vLLM — The Reference Implementation
+### 9.1 vLLM   The Reference Implementation
 
 **GitHub:** [vllm-project/vllm](https://github.com/vllm-project/vllm) | **Stars:** 79,765+ | **License:** Apache 2.0
 
@@ -1082,7 +1082,7 @@ kv_transfer:
   bandwidth: 400Gbps
 ```
 
-### 9.2 SGLang — The Throughput Leader
+### 9.2 SGLang   The Throughput Leader
 
 **GitHub:** [sgl-project/sglang](https://github.com/sgl-project/sglang) | **Stars:** 27,694+ | **License:** Apache 2.0
 
@@ -1118,7 +1118,7 @@ SGLang Architecture:
 
 1. **RadixAttention**: Radix-tree prefix cache with 85–95% hit rates for shared-prefix workloads
 2. **xGrammar**: Grammar-guided structured output (JSON, regex) with 10× faster generation than naive constrained decoding; compiled grammars cached in radix tree
-3. **Disaggregated serving**: Decode-side radix cache reuse — even after KV transfer to a decode instance, the radix tree tracks which prefix KV blocks can be reused across requests
+3. **Disaggregated serving**: Decode-side radix cache reuse   even after KV transfer to a decode instance, the radix tree tracks which prefix KV blocks can be reused across requests
 4. **Elastic expert parallel recovery**: MoE expert groups recover from GPU failure without full cluster restart
 5. **Diffusion model serving**: Dynamic batching for diffusion models alongside LLM serving (text + image/video under one scheduler)
 
@@ -1129,7 +1129,7 @@ SGLang Architecture:
 
 **Scale:** Powers 400,000+ GPUs globally, trillions of tokens daily.
 
-### 9.3 NVIDIA TensorRT-LLM — Maximum Performance
+### 9.3 NVIDIA TensorRT-LLM   Maximum Performance
 
 **GitHub:** [NVIDIA/TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) | **Stars:** 13,614+ | **License:** Apache 2.0
 
@@ -1171,7 +1171,7 @@ TensorRT-LLM Pipeline:
 - Cold start: ~28 min (initial compile) + ~90 sec (subsequent warm starts)
 
 **GB200/Blackwell support (2026):**
-- Native FP4 (MXFP4) support — 2× throughput vs. FP8 on B200
+- Native FP4 (MXFP4) support   2× throughput vs. FP8 on B200
 - DFlash speculative decoding
 - Chunked prefill for interleaved video/text multimodal content
 - Sparse MLA (Multi-head Latent Attention) for DeepSeek models
@@ -1183,11 +1183,11 @@ Recent research (Blink, 2026) wraps TensorRT-LLM engines in a CPU-free serving a
 - BlueField-3 DPU handles network I/O via RDMA
 - Result: P99 TTFT reduced by up to 8.47× vs. TRT-LLM with CPU orchestration
 
-### 9.4 llama.cpp — Portability Champion
+### 9.4 llama.cpp   Portability Champion
 
 **GitHub:** [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) | **License:** MIT
 
-llama.cpp is the portability champion of the inference ecosystem — a C++ implementation that runs on CPUs, consumer GPUs, Apple Silicon, and specialized hardware without dependencies on CUDA or PyTorch.
+llama.cpp is the portability champion of the inference ecosystem   a C++ implementation that runs on CPUs, consumer GPUs, Apple Silicon, and specialized hardware without dependencies on CUDA or PyTorch.
 
 ```
 llama.cpp Backend Support Matrix:
@@ -1226,7 +1226,7 @@ llama.cpp Backend Support Matrix:
 
 **Production ceiling:** At 50 concurrent users, throughput plateaus at ~155 tok/s. For developer workstations, local inference, and CPU-only environments, it's unrivaled. For production scale, migrate to vLLM or SGLang.
 
-### 9.5 Triton Inference Server — Enterprise Orchestration
+### 9.5 Triton Inference Server   Enterprise Orchestration
 
 **GitHub:** [triton-inference-server/server](https://github.com/triton-inference-server/server)
 
@@ -1261,7 +1261,7 @@ Triton Inference Server Stack:
 - Concurrent model instance management
 - Binary wheel distribution for deployment
 
-### 9.6 Ray Serve — Distributed Serving Control Plane
+### 9.6 Ray Serve   Distributed Serving Control Plane
 
 **GitHub:** [ray-project/ray](https://github.com/ray-project/ray)
 
@@ -1285,12 +1285,12 @@ Ray Serve Multi-Engine Deployment:
 ```
 
 **Key 2026 additions:**
-- **Kubernetes in-place pod resizing**: Dynamically resize GPU pod allocations without restart — critical for cost-optimized inference clusters
+- **Kubernetes in-place pod resizing**: Dynamically resize GPU pod allocations without restart   critical for cost-optimized inference clusters
 - **Configurable rolling update percentages**: Gradual rollout of model updates with configurable blast radius
 - **vLLM integration fixes**: Deep integration for multi-replica vLLM deployments
 - **Ingress routing**: Custom routing logic for A/B testing, canary deployments
 
-### 9.7 KubeAI — Kubernetes-Native Serving
+### 9.7 KubeAI   Kubernetes-Native Serving
 
 **GitHub:** [kubeai-project/kubeai](https://github.com/kubeai-project/kubeai)
 
@@ -1458,7 +1458,7 @@ Blink (CPU-Free):
    - No per-token CPU interaction required
 
 2. **Device-side CUDA graph launch** (fire-and-forget mode): Enables the GPU scheduler to launch inference graphs without a CPU round-trip. Key constraint: 120-launch limit per graph execution window.
-   - **Solution**: Window-based tail-launch recovery — fire-and-forget for 120 steps, single tail-launch at step 121 to reset
+   - **Solution**: Window-based tail-launch recovery   fire-and-forget for 120 steps, single tail-launch at step 121 to reset
    - Overhead: < 0.03% per decode step
    - Speedup: 58× faster than host-side launch per kernel dispatch
 
@@ -1477,7 +1477,7 @@ Blink (CPU-Free):
 | Metric | vLLM | TRT-LLM | SGLang | Blink |
 |--------|------|---------|--------|-------|
 | P99 TTFT (isolated) | 150ms | ~120ms | ~110ms | **17.7ms** |
-| P99 TTFT reduction vs. TRT | — | baseline | ~8% | **8.47×** |
+| P99 TTFT reduction vs. TRT |   | baseline | ~8% | **8.47×** |
 | P99 TPOT | 14.4ms | ~12ms | ~11ms | **4.2ms** |
 | Decode Throughput | 7,475 tok/s | ~8,000 | ~8,500 | **~15,700 tok/s** |
 | Under CPU interference | -83% throughput | -72% | -68% | **0% degradation** |
@@ -1487,7 +1487,7 @@ Blink (CPU-Free):
 - P99 TTFT inflates from 150ms to 20,959ms (139×)
 - Blink: completely unaffected (CPU not on critical path)
 
-**Energy efficiency:** Blink reduces energy per token by 48.6% vs. isolated baselines, and up to 70.7% under CPU interference — because CPU-induced GPU idle time is eliminated.
+**Energy efficiency:** Blink reduces energy per token by 48.6% vs. isolated baselines, and up to 70.7% under CPU interference   because CPU-induced GPU idle time is eliminated.
 
 ---
 
@@ -1634,7 +1634,7 @@ Precision Format Hierarchy:
 1. **Per-tensor static**: Single scale factor per tensor computed offline
 2. **Per-tensor dynamic**: Scale factor computed per-step at runtime
 3. **Per-token/per-channel**: Finer-grained scaling for better accuracy
-4. **MXFP8 (Microscaling)**: Sub-tensor scaling with 8-element groups — better accuracy, native Blackwell support
+4. **MXFP8 (Microscaling)**: Sub-tensor scaling with 8-element groups   better accuracy, native Blackwell support
 
 **FP8 quality vs. throughput (Llama 3 70B on H100):**
 - Quality degradation: < 1% perplexity increase vs. BF16
@@ -1662,7 +1662,7 @@ Throughput: 2,800 TFLOP/s (vs. 1,400 FP8) on B200 = 2× improvement
 - Model size: 671B total parameters
 - FP4 weights: ~670 GB vs. ~1.34 TB in BF16
 - Fits in: ~4 GB200 nodes (4 × 72 = 288 B200 GPUs, 288 × 192 GB = ~55 TB capacity)
-- Single NVL72 rack: 72 GPUs × 192 GB = 13.8 TB — handles 20+ DeepSeek-V3 instances simultaneously in FP4
+- Single NVL72 rack: 72 GPUs × 192 GB = 13.8 TB   handles 20+ DeepSeek-V3 instances simultaneously in FP4
 
 **TensorRT-LLM FP4 results (GB200):**
 - FP4 doubles throughput vs. FP8 with near-identical output quality on standard benchmarks
@@ -1695,7 +1695,7 @@ Weight-Only INT4 (W4A16) Flow:
 | QuIP# | Incoherence processing | 95-98% | 1.5× | Excellent quality |
 | AQLM | Additive quantization | 94-97% | 1.5-2× | 2-bit capable |
 
-**LMDeploy TurboMind INT4 results:** For Llama 3 70B INT4 on A100 80GB at 100 concurrent users: 700 tok/s with lowest TTFT across engines — 2.4× faster than FP16.
+**LMDeploy TurboMind INT4 results:** For Llama 3 70B INT4 on A100 80GB at 100 concurrent users: 700 tok/s with lowest TTFT across engines   2.4× faster than FP16.
 
 ### 12.4 GGUF and k-Quants for Edge Inference
 
@@ -1818,7 +1818,7 @@ This data from the Blink paper quantifies the production risk of CPU interferenc
 | LLC Miss Rate | 7.0% | 43.2% | 71.6% |
 | Walk Active (page table walks) | 383M | 920M | 1,454M |
 
-**Root cause:** TLB invalidations from colocated CPU workloads force page-table re-traversal in a polluted LLC. This is a CPU microarchitectural issue that cannot be solved by tuning serving software — it requires architectural changes (removing CPU from critical path, as Blink does).
+**Root cause:** TLB invalidations from colocated CPU workloads force page-table re-traversal in a polluted LLC. This is a CPU microarchitectural issue that cannot be solved by tuning serving software   it requires architectural changes (removing CPU from critical path, as Blink does).
 
 **Standard mitigations that DON'T work:**
 - Huge pages (2MB, 1GB): < 4% improvement
@@ -1834,7 +1834,7 @@ The inference serving landscape in May 2026 is characterized by rapid convergenc
 
 ### Trend 1: Disaggregated Serving Going Mainstream
 
-What was experimental in 2024 is production-grade in 2026. SGLang, vLLM, AI-Dynamo, and TensorRT-LLM all ship stable PD-disaggregated serving. The next question is **operational simplicity** — which stack makes disaggregated serving "boring" to operate.
+What was experimental in 2024 is production-grade in 2026. SGLang, vLLM, AI-Dynamo, and TensorRT-LLM all ship stable PD-disaggregated serving. The next question is **operational simplicity**   which stack makes disaggregated serving "boring" to operate.
 
 ```
 Disaggregated Serving Maturity Timeline:
@@ -1852,10 +1852,10 @@ DeepSeek V4 became the integration test of 2026: vLLM, SGLang, TensorRT-LLM, ktr
 ### Trend 3: MoE-First Architecture
 
 Frontier models are now predominantly MoE:
-- DeepSeek V3/R1 (671B, MoE) — dominant open-weights frontier
-- Gemma 4 (MoE variant) — Google's production open model
-- Qwen-3 MoE variants — Alibaba's efficient models
-- GPT-4 (assumed MoE) — OpenAI's production model
+- DeepSeek V3/R1 (671B, MoE)   dominant open-weights frontier
+- Gemma 4 (MoE variant)   Google's production open model
+- Qwen-3 MoE variants   Alibaba's efficient models
+- GPT-4 (assumed MoE)   OpenAI's production model
 
 Serving stacks that lack optimized expert parallelism, MoE routing kernels, and FP4 quantization are increasingly disadvantaged.
 
@@ -1904,11 +1904,11 @@ The inference stack is becoming infrastructure, and infrastructure requires oper
 
 **1. Neuromorphic KV Cache Storage:** Non-volatile memory (CXL-attached persistent memory, NVMe Storage-Class Memory) as primary KV cache tier, enabling terabyte-scale KV pools per server.
 
-**2. Disaggregated Attention Computation:** Splitting even the attention operation itself across specialized hardware — attention accelerators (e.g., NVIDIA's future attention-specific ASICs) separate from GEMM accelerators for FFN.
+**2. Disaggregated Attention Computation:** Splitting even the attention operation itself across specialized hardware   attention accelerators (e.g., NVIDIA's future attention-specific ASICs) separate from GEMM accelerators for FFN.
 
 **3. Continuous Model Updates:** Serving frameworks that support in-flight model weight updates (LoRA adaptation, RLHF fine-tuning) without serving interruption, enabling continuous learning loops.
 
-**4. Heterogeneous MoE Serving:** Expert-level heterogeneity — different experts may run at different precisions, on different hardware (GPU vs. CPU vs. PIM), dynamically managed based on expert utilization frequency.
+**4. Heterogeneous MoE Serving:** Expert-level heterogeneity   different experts may run at different precisions, on different hardware (GPU vs. CPU vs. PIM), dynamically managed based on expert utilization frequency.
 
 **5. Serverless Inference:** True pay-per-token billing with sub-second cold starts, enabled by speculative KV cache pre-population and model weight pre-staging on network-attached storage.
 
@@ -1918,7 +1918,7 @@ The inference stack is becoming infrastructure, and infrastructure requires oper
 
 **2. In-Memory Compute for KV Attention:** Processing-in-Memory (PIM) accelerators that compute attention directly in HBM stacks, eliminating the bandwidth bottleneck for decode entirely.
 
-**3. Dynamic Model Architecture Adaptation:** Models that adapt their architecture (number of active experts, attention head count, layer depth) per request based on complexity — serving both simple requests efficiently and complex requests accurately.
+**3. Dynamic Model Architecture Adaptation:** Models that adapt their architecture (number of active experts, attention head count, layer depth) per request based on complexity   serving both simple requests efficiently and complex requests accurately.
 
 ---
 
@@ -1938,7 +1938,7 @@ The inference stack is becoming infrastructure, and infrastructure requires oper
    Jiale Xu et al., Shanghai Jiao Tong University & Ant Group, 2024.  
    [arxiv.org/abs/2407.15309](https://arxiv.org/abs/2407.15309)
 
-4. **Inference Radar — Week 18, 2026**  
+4. **Inference Radar   Week 18, 2026**  
    OpenClaw PI Newsletter. [openclawpi.com/newsletter/2026-W18](https://www.openclawpi.com/newsletter/2026-W18)
 
 5. **Best Open-Source LLM Inference Servers 2026**  
@@ -1946,37 +1946,37 @@ The inference stack is becoming infrastructure, and infrastructure requires oper
 
 ### Serving Frameworks
 
-6. **vLLM** — High-throughput and memory-efficient inference engine for LLMs.  
+6. **vLLM**   High-throughput and memory-efficient inference engine for LLMs.  
    [github.com/vllm-project/vllm](https://github.com/vllm-project/vllm) · 79,765+ stars
 
-7. **SGLang** — High-performance serving framework for LLMs and multimodal models.  
+7. **SGLang**   High-performance serving framework for LLMs and multimodal models.  
    [github.com/sgl-project/sglang](https://github.com/sgl-project/sglang) · 27,694+ stars
 
-8. **NVIDIA TensorRT-LLM** — State-of-the-art LLM inference on NVIDIA GPUs.  
+8. **NVIDIA TensorRT-LLM**   State-of-the-art LLM inference on NVIDIA GPUs.  
    [github.com/NVIDIA/TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) · 13,614+ stars
 
-9. **llama.cpp** — LLM inference in C/C++.  
+9. **llama.cpp**   LLM inference in C/C++.  
    [github.com/ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
 
-10. **FlashInfer** — Kernel library for LLM serving.  
+10. **FlashInfer**   Kernel library for LLM serving.  
     [github.com/flashinfer-ai/flashinfer](https://github.com/flashinfer-ai/flashinfer) · 5,598+ stars
 
-11. **LMCache** — Fastest KV cache layer for LLM serving.  
+11. **LMCache**   Fastest KV cache layer for LLM serving.  
     [github.com/LMCache/LMCache](https://github.com/LMCache/LMCache) · 8,254+ stars
 
-12. **Mooncake** — Serving platform for Kimi (Moonshot AI).  
+12. **Mooncake**   Serving platform for Kimi (Moonshot AI).  
     [github.com/kvcache-ai/Mooncake](https://github.com/kvcache-ai/Mooncake) · 5,310+ stars
 
-13. **Ray** — Distributed computing for ML, including Ray Serve.  
+13. **Ray**   Distributed computing for ML, including Ray Serve.  
     [github.com/ray-project/ray](https://github.com/ray-project/ray)
 
-14. **KubeAI** — Kubernetes-native AI serving platform.  
+14. **KubeAI**   Kubernetes-native AI serving platform.  
     [github.com/kubeai-project/kubeai](https://github.com/kubeai-project/kubeai)
 
-15. **Triton Inference Server** — Production-grade model serving.  
+15. **Triton Inference Server**   Production-grade model serving.  
     [github.com/triton-inference-server/server](https://github.com/triton-inference-server/server)
 
-16. **Awesome LLM Inference Engine** — Curated list of inference resources.  
+16. **Awesome LLM Inference Engine**   Curated list of inference resources.  
     [github.com/sihyeong/Awesome-LLM-Inference-Engine](https://github.com/sihyeong/Awesome-LLM-Inference-Engine)
 
 ### Key Papers Referenced Within Sources
