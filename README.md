@@ -177,11 +177,11 @@ graph TB
         mem -.->|Arithmetic<br/>Intensity| decode
     end
     
-    style roof fill:#f9f9f9
-    style compute fill:#e8f4f8
-    style mem fill:#f0e8f8
-    style prefill fill:#c8e6c9
-    style decode fill:#ffccbc
+
+
+
+
+
 ```
 
 **Memory bandwidth specs across generations:**
@@ -527,12 +527,12 @@ graph TB
     E7 --> Output
     E14 --> Output
     
-    style Router fill:#ffeb3b
-    style E0 fill:#4caf50
-    style E2 fill:#4caf50
-    style E7 fill:#4caf50
-    style E14 fill:#4caf50
-    style Output fill:#2196f3
+
+
+
+
+
+
 ```
 
 **Dominant MoE models (2026):**
@@ -579,11 +579,11 @@ graph TB
         AlltoAll -.->|dispatch| GPU3
     end
     
-    style GPU0 fill:#c8e6c9
-    style GPU1 fill:#c8e6c9
-    style GPU2 fill:#c8e6c9
-    style GPU3 fill:#c8e6c9
-    style AlltoAll fill:#fff9c4
+
+
+
+
+
 ```
 
 **AlltoAll communication cost for MoE:**
@@ -651,8 +651,8 @@ graph TB
         B4 --> Frag2
     end
     
-    style Traditional fill:#ffcccc
-    style Paged fill:#ccffcc
+
+
 ```
 
 **PagedAttention implementation details:**
@@ -804,10 +804,10 @@ graph TB
     
     Backend --> LMCache
     
-    style VRAM fill:#ffcdd2
-    style DRAM fill:#ffe0b2
-    style SSD fill:#e0e0e0
-    style Remote fill:#b3e5fc
+
+
+
+
 ```
 
 **LMCache capabilities:**
@@ -914,8 +914,8 @@ graph LR
         Tiled --> Mem2
     end
     
-    style Mem1 fill:#ffcccc
-    style Mem2 fill:#ccffcc
+
+
 ```
 
 | Version | Key Innovation | GPU Target | Key Benefit |
@@ -1375,8 +1375,8 @@ graph TB
         S1 --> S2 --> S3 --> S4 --> Idle2
     end
     
-    style Idle1 fill:#ffcccc
-    style Idle2 fill:#ccffcc
+
+
 ```
 
 **Implementation mechanics:**
@@ -1406,8 +1406,8 @@ graph TB
         P1C --> P2C --> PN --> PNC
     end
     
-    style P1 fill:#ffcccc
-    style WithChunk fill:#ccffcc
+
+
 ```
 
 **Trade-off:** Chunked prefill increases TTFT for the prefill request (split across 16 steps instead of 1) but dramatically reduces P99 TTFT for concurrent decode requests. The chunk size is a tunable parameter:
@@ -1476,8 +1476,8 @@ graph TB
         BGPU --> BGen2
     end
     
-    style TCPU fill:#ffcccc
-    style BlinkArch fill:#ccffcc
+
+
 ```
 
 **Blink's technical components:**
@@ -1612,10 +1612,10 @@ graph TB
         AlltoAll2 --> Combine
     end
     
-    style Router fill:#ffeb3b
-    style AlltoAll1 fill:#fff9c4
-    style AlltoAll2 fill:#fff9c4
-    style Combine fill:#2196f3
+
+
+
+
 ```
 
 **EP at scale for DeepSeek-V3 (256 experts):**
