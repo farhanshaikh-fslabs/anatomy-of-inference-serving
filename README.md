@@ -10,87 +10,72 @@
 
 ## Table of Contents
 
-- [Anatomy of Inference Serving](#anatomy-of-inference-serving)
-    - [A Comprehensive Whitepaper on Aggregated/Disaggregated Configurations, Hardware Frontiers, and the Science of LLM Serving at Scale](#a-comprehensive-whitepaper-on-aggregateddisaggregated-configurations-hardware-frontiers-and-the-science-of-llm-serving-at-scale)
-  - [Table of Contents](#table-of-contents)
-  - [1. Executive Summary](#1-executive-summary)
-  - [2. The Anatomy of LLM Inference](#2-the-anatomy-of-llm-inference)
-    - [2.1 Prefill Phase](#21-prefill-phase)
-    - [2.2 Decode Phase](#22-decode-phase)
-    - [2.3 The Compute-Memory Duality](#23-the-compute-memory-duality)
-  - [3. Aggregated vs. Disaggregated Serving Configurations](#3-aggregated-vs-disaggregated-serving-configurations)
-    - [3.1 Aggregated (Coupled) Architecture](#31-aggregated-coupled-architecture)
-    - [3.2 Disaggregated (PD-Split) Architecture](#32-disaggregated-pd-split-architecture)
-    - [3.3 Configuration Trade-offs and Learnings](#33-configuration-trade-offs-and-learnings)
-    - [3.4 KV Cache Migration in Disaggregated Systems](#34-kv-cache-migration-in-disaggregated-systems)
-  - [4. Hardware Landscape](#4-hardware-landscape)
-    - [4.1 NVIDIA H100 SXM5   The Current Standard](#41-nvidia-h100-sxm5---the-current-standard)
-    - [4.2 NVIDIA H200   HBM3e and Memory Bandwidth Leap](#42-nvidia-h200---hbm3e-and-memory-bandwidth-leap)
-    - [4.3 NVIDIA GB200 NVL72   The Grace Blackwell Superchip](#43-nvidia-gb200-nvl72---the-grace-blackwell-superchip)
-    - [4.4 Interconnect: NVLink, NVSwitch, and Infiniband](#44-interconnect-nvlink-nvswitch-and-infiniband)
-    - [4.5 AMD MI300X   The Challenger](#45-amd-mi300x---the-challenger)
-  - [5. Model Architectures Under the Serving Lens](#5-model-architectures-under-the-serving-lens)
-    - [5.1 Dense Transformer Models](#51-dense-transformer-models)
-    - [5.2 Mixture-of-Experts (MoE) Models](#52-mixture-of-experts-moe-models)
-    - [5.3 MoE Serving: Expert Parallelism and Load Balancing](#53-moe-serving-expert-parallelism-and-load-balancing)
-    - [5.4 Multimodal and Multimodal-MoE Models](#54-multimodal-and-multimodal-moe-models)
-  - [6. KV Cache: The Central Resource](#6-kv-cache-the-central-resource)
-    - [6.1 PagedAttention and the Virtual Memory Analogy](#61-pagedattention-and-the-virtual-memory-analogy)
-    - [6.2 Prefix Caching and RadixAttention](#62-prefix-caching-and-radixattention)
-    - [6.3 vTensor: Virtual Memory-Based KV Management](#63-vtensor-virtual-memory-based-kv-management)
-    - [6.4 GQA, MQA, and KV Cache Reduction](#64-gqa-mqa-and-kv-cache-reduction)
-  - [7. KV Cache Transfer and Distribution](#7-kv-cache-transfer-and-distribution)
-    - [7.1 LMCache: The KV Cache Layer](#71-lmcache-the-kv-cache-layer)
-    - [7.2 Mooncake: Kimi's Serving Platform](#72-mooncake-kimis-serving-platform)
-  - [8. Attention Kernel Engineering](#8-attention-kernel-engineering)
-    - [8.1 FlashAttention Evolution: FA1 → FA2 → FA3](#81-flashattention-evolution-fa1--fa2--fa3)
-    - [8.2 FlashInfer: Customizable Attention Engine](#82-flashinfer-customizable-attention-engine)
-    - [8.3 Block-Sparse Formats and Composable Attention](#83-block-sparse-formats-and-composable-attention)
-    - [8.4 Load-Balanced Dynamic Scheduling](#84-load-balanced-dynamic-scheduling)
-  - [9. Serving Engine Deep Dives](#9-serving-engine-deep-dives)
-    - [9.1 vLLM   The Reference Implementation](#91-vllm---the-reference-implementation)
-    - [9.2 SGLang: The Throughput Leader](#92-sglang-the-throughput-leader)
-    - [9.3 NVIDIA TensorRT-LLM   Maximum Performance](#93-nvidia-tensorrt-llm---maximum-performance)
-    - [9.4 llama.cpp   Portability Champion](#94-llamacpp---portability-champion)
-    - [9.5 Triton Inference Server   Enterprise Orchestration](#95-triton-inference-server---enterprise-orchestration)
-    - [9.6 Ray Serve   Distributed Serving Control Plane](#96-ray-serve---distributed-serving-control-plane)
-    - [9.7 KubeAI   Kubernetes-Native Serving](#97-kubeai---kubernetes-native-serving)
-  - [10. Scheduling, Batching, and Control Plane Design](#10-scheduling-batching-and-control-plane-design)
-    - [10.1 Continuous Batching (Orca)](#101-continuous-batching-orca)
-    - [10.2 Chunked Prefill and Stall Reduction](#102-chunked-prefill-and-stall-reduction)
-    - [10.3 Speculative Decoding](#103-speculative-decoding)
-    - [10.4 CPU-Free Inference: Blink Architecture](#104-cpu-free-inference-blink-architecture)
-  - [11. Parallelism Strategies](#11-parallelism-strategies)
-    - [11.1 Tensor Parallelism (TP)](#111-tensor-parallelism-tp)
-    - [11.2 Pipeline Parallelism (PP)](#112-pipeline-parallelism-pp)
-    - [11.3 Expert Parallelism (EP) for MoE](#113-expert-parallelism-ep-for-moe)
-    - [11.4 Sequence and Context Parallelism](#114-sequence-and-context-parallelism)
-    - [11.5 Data Parallelism (DP)](#115-data-parallelism-dp)
-  - [12. Quantization and Precision](#12-quantization-and-precision)
-    - [12.1 FP8 Quantization on H100/H200](#121-fp8-quantization-on-h100h200)
-    - [12.2 FP4 on GB200 Blackwell](#122-fp4-on-gb200-blackwell)
-    - [12.3 INT4/GPTQ/AWQ and Weight-Only Quantization](#123-int4gptqawq-and-weight-only-quantization)
-    - [12.4 GGUF and k-Quants for Edge Inference](#124-gguf-and-k-quants-for-edge-inference)
-  - [13. Production Performance Benchmarks](#13-production-performance-benchmarks)
-    - [13.1 H100 Throughput Comparison (2026)](#131-h100-throughput-comparison-2026)
-    - [13.2 Latency Metrics: TTFT, TPOT, ITL](#132-latency-metrics-ttft-tpot-itl)
-    - [13.3 MoE vs Dense Model Performance Profiles](#133-moe-vs-dense-model-performance-profiles)
-    - [13.4 Impact of CPU Interference (vLLM Colocation Study)](#134-impact-of-cpu-interference-vllm-colocation-study)
-  - [14. Ecosystem Trends and Convergence (2026)](#14-ecosystem-trends-and-convergence-2026)
-    - [Trend 1: Disaggregated Serving Going Mainstream](#trend-1-disaggregated-serving-going-mainstream)
-    - [Trend 2: Model Bring-Up Speed as Platform Capability](#trend-2-model-bring-up-speed-as-platform-capability)
-    - [Trend 3: MoE-First Architecture](#trend-3-moe-first-architecture)
-    - [Trend 4: Edge Inference Professionalizing](#trend-4-edge-inference-professionalizing)
-    - [Trend 5: CPU-Free and SmartNIC Architectures](#trend-5-cpu-free-and-smartnic-architectures)
-    - [Trend 6: Operational Maturity Over Raw Performance](#trend-6-operational-maturity-over-raw-performance)
-  - [15. Future Directions](#15-future-directions)
-    - [Near-Term (6–18 months)](#near-term-618-months)
-    - [Medium-Term (18 months – 3 years)](#medium-term-18-months--3-years)
-    - [Long-Term (3+ years)](#long-term-3-years)
-  - [16. References and Sources](#16-references-and-sources)
-    - [Primary Sources](#primary-sources)
-    - [Serving Frameworks](#serving-frameworks)
-    - [Key Papers Referenced Within Sources](#key-papers-referenced-within-sources)
+1. [Executive Summary](#1-executive-summary)
+2. [The Anatomy of LLM Inference](#2-the-anatomy-of-llm-inference)
+   - 2.1 [Prefill Phase](#21-prefill-phase)
+   - 2.2 [Decode Phase](#22-decode-phase)
+   - 2.3 [The Compute-Memory Duality](#23-the-compute-memory-duality)
+3. [Aggregated vs. Disaggregated Serving Configurations](#3-aggregated-vs-disaggregated-serving-configurations)
+   - 3.1 [Aggregated (Coupled) Architecture](#31-aggregated-coupled-architecture)
+   - 3.2 [Disaggregated (PD-Split) Architecture](#32-disaggregated-pd-split-architecture)
+   - 3.3 [Configuration Trade-offs and Learnings](#33-configuration-trade-offs-and-learnings)
+   - 3.4 [KV Cache Migration in Disaggregated Systems](#34-kv-cache-migration-in-disaggregated-systems)
+4. [Hardware Landscape](#4-hardware-landscape)
+   - 4.1 [NVIDIA H100 SXM5 — The Current Standard](#41-nvidia-h100-sxm5--the-current-standard)
+   - 4.2 [NVIDIA H200 — HBM3e and Memory Bandwidth Leap](#42-nvidia-h200--hbm3e-and-memory-bandwidth-leap)
+   - 4.3 [NVIDIA GB200 NVL72 — The Grace Blackwell Superchip](#43-nvidia-gb200-nvl72--the-grace-blackwell-superchip)
+   - 4.4 [Interconnect: NVLink, NVSwitch, and Infiniband](#44-interconnect-nvlink-nvswitch-and-infiniband)
+   - 4.5 [AMD MI300X — The Challenger](#45-amd-mi300x--the-challenger)
+5. [Model Architectures Under the Serving Lens](#5-model-architectures-under-the-serving-lens)
+   - 5.1 [Dense Transformer Models](#51-dense-transformer-models)
+   - 5.2 [Mixture-of-Experts (MoE) Models](#52-mixture-of-experts-moe-models)
+   - 5.3 [MoE Serving: Expert Parallelism and Load Balancing](#53-moe-serving-expert-parallelism-and-load-balancing)
+   - 5.4 [Multimodal and Multimodal-MoE Models](#54-multimodal-and-multimodal-moe-models)
+6. [KV Cache: The Central Resource](#6-kv-cache-the-central-resource)
+   - 6.1 [PagedAttention and the Virtual Memory Analogy](#61-pagedattention-and-the-virtual-memory-analogy)
+   - 6.2 [Prefix Caching and RadixAttention](#62-prefix-caching-and-radixattention)
+   - 6.3 [vTensor: Virtual Memory-Based KV Management](#63-vtensor-virtual-memory-based-kv-management)
+   - 6.4 [GQA, MQA, and KV Cache Reduction](#64-gqa-mqa-and-kv-cache-reduction)
+7. [KV Cache Transfer and Distribution](#7-kv-cache-transfer-and-distribution)
+   - 7.1 [LMCache: The KV Cache Layer](#71-lmcache-the-kv-cache-layer)
+   - 7.2 [Mooncake: Kimi's Serving Platform](#72-mooncake-kimis-serving-platform)
+8. [Attention Kernel Engineering](#8-attention-kernel-engineering)
+   - 8.1 [FlashAttention Evolution: FA1 → FA2 → FA3](#81-flashattention-evolution-fa1--fa2--fa3)
+   - 8.2 [FlashInfer: Customizable Attention Engine](#82-flashinfer-customizable-attention-engine)
+   - 8.3 [Block-Sparse Formats and Composable Attention](#83-block-sparse-formats-and-composable-attention)
+   - 8.4 [Load-Balanced Dynamic Scheduling](#84-load-balanced-dynamic-scheduling)
+9. [Serving Engine Deep Dives](#9-serving-engine-deep-dives)
+   - 9.1 [vLLM — The Reference Implementation](#91-vllm--the-reference-implementation)
+   - 9.2 [SGLang — The Throughput Leader](#92-sglang--the-throughput-leader)
+   - 9.3 [NVIDIA TensorRT-LLM — Maximum Performance](#93-nvidia-tensorrt-llm--maximum-performance)
+   - 9.4 [llama.cpp — Portability Champion](#94-llamacpp--portability-champion)
+   - 9.5 [Triton Inference Server — Enterprise Orchestration](#95-triton-inference-server--enterprise-orchestration)
+   - 9.6 [Ray Serve — Distributed Serving Control Plane](#96-ray-serve--distributed-serving-control-plane)
+   - 9.7 [KubeAI — Kubernetes-Native Serving](#97-kubeai--kubernetes-native-serving)
+10. [Scheduling, Batching, and Control Plane Design](#10-scheduling-batching-and-control-plane-design)
+    - 10.1 [Continuous Batching (Orca)](#101-continuous-batching-orca)
+    - 10.2 [Chunked Prefill and Stall Reduction](#102-chunked-prefill-and-stall-reduction)
+    - 10.3 [Speculative Decoding](#103-speculative-decoding)
+    - 10.4 [CPU-Free Inference: Blink Architecture](#104-cpu-free-inference-blink-architecture)
+11. [Parallelism Strategies](#11-parallelism-strategies)
+    - 11.1 [Tensor Parallelism (TP)](#111-tensor-parallelism-tp)
+    - 11.2 [Pipeline Parallelism (PP)](#112-pipeline-parallelism-pp)
+    - 11.3 [Expert Parallelism (EP) for MoE](#113-expert-parallelism-ep-for-moe)
+    - 11.4 [Sequence and Context Parallelism](#114-sequence-and-context-parallelism)
+    - 11.5 [Data Parallelism (DP)](#115-data-parallelism-dp)
+12. [Quantization and Precision](#12-quantization-and-precision)
+    - 12.1 [FP8 Quantization on H100/H200](#121-fp8-quantization-on-h100h200)
+    - 12.2 [FP4 on GB200 Blackwell](#122-fp4-on-gb200-blackwell)
+    - 12.3 [INT4/GPTQ/AWQ and Weight-Only Quantization](#123-int4gptqawq-and-weight-only-quantization)
+    - 12.4 [GGUF and k-Quants for Edge Inference](#124-gguf-and-k-quants-for-edge-inference)
+13. [Production Performance Benchmarks](#13-production-performance-benchmarks)
+    - 13.1 [H100 Throughput Comparison (2026)](#131-h100-throughput-comparison-2026)
+    - 13.2 [Latency Metrics: TTFT, TPOT, ITL](#132-latency-metrics-ttft-tpot-itl)
+    - 13.3 [MoE vs Dense Model Performance Profiles](#133-moe-vs-dense-model-performance-profiles)
+    - 13.4 [Impact of CPU Interference (vLLM Colocation Study)](#134-impact-of-cpu-interference-vllm-colocation-study)
+14. [Ecosystem Trends and Convergence (2026)](#14-ecosystem-trends-and-convergence-2026)
+15. [Future Directions](#15-future-directions)
+16. [References and Sources](#16-references-and-sources)
 
 ---
 
@@ -209,7 +194,7 @@ graph TB
 | B200 192GB SXM | HBM3e | 8,000 GB/s | 192 GB | 2,250 | 4,500 |
 | GB200 (Grace-Blackwell) | HBM3e | 8,000 GB/s | 192 GB | 2,250 | 4,500 |
 
-The H200's primary improvement over H100 is **43% more memory bandwidth** and **76% more VRAM** both directly accelerating the decode phase. The GB200 doubles bandwidth again and adds native FP4 support.
+The H200's primary improvement over H100 is **43% more memory bandwidth** and **76% more VRAM** — both directly accelerating the decode phase. The GB200 doubles bandwidth again and adds native FP4 support.
 
 ---
 
@@ -337,7 +322,7 @@ graph LR
 
 ## 4. Hardware Landscape
 
-### 4.1 NVIDIA H100 SXM5   The Current Standard
+### 4.1 NVIDIA H100 SXM5 — The Current Standard
 
 The H100 remains the deployment standard for 2025-2026 production LLM serving:
 
@@ -359,9 +344,9 @@ graph TB
 - **NVLink 4.0**: 8-GPU HGX nodes with 900 GB/s all-to-all bandwidth, enabling TP=8 with minimal latency
 - **Optimal workloads**: Dense models up to 70B at full precision, MoE models up to 671B with EP+TP parallelism
 
-### 4.2 NVIDIA H200   HBM3e and Memory Bandwidth Leap
+### 4.2 NVIDIA H200 — HBM3e and Memory Bandwidth Leap
 
-The H200 is H100 compute with HBM3e memory   a targeted upgrade for memory-bandwidth-bound workloads:
+The H200 is H100 compute with HBM3e memory — a targeted upgrade for memory-bandwidth-bound workloads:
 
 **H100 vs H200 Comparison:**
 
@@ -383,7 +368,7 @@ The H200 is H100 compute with HBM3e memory   a targeted upgrade for memory-bandw
 
 **Optimal use cases:** Long-context workloads (RAG with large documents, multi-turn conversations, coding assistants with large codebases), high-batch decode serving where bandwidth is the bottleneck.
 
-### 4.3 NVIDIA GB200 NVL72   The Grace Blackwell Superchip
+### 4.3 NVIDIA GB200 NVL72 — The Grace Blackwell Superchip
 
 The GB200 represents a generational leap that fundamentally changes multi-GPU serving architectures:
 
@@ -413,7 +398,7 @@ graph TB
 
 3. **Expert parallelism at scale**: For DeepSeek-V3 with 256 experts (8 active per token), EP=256 across 72 GPUs is feasible with NVLink eliminating all-to-all bottlenecks.
 
-4. **Grace CPU coherence**: The ARM Grace CPU with coherent NVLink-C2C connection to GPUs eliminates PCIe transfer overhead. KV cache migration between CPU DRAM and GPU HBM is 900 GB/s   comparable to older GPU-to-GPU NVLink.
+4. **Grace CPU coherence**: The ARM Grace CPU with coherent NVLink-C2C connection to GPUs eliminates PCIe transfer overhead. KV cache migration between CPU DRAM and GPU HBM is 900 GB/s — comparable to older GPU-to-GPU NVLink.
 
 **SGLang FP4 Results on GB200 (2026):**
 - FP4/FP8 quantization support across NVIDIA GB200/B300/H100
@@ -453,7 +438,7 @@ For TP=N across LLama 3 70B (4096-dim hidden, BF16):
 - 80 layers = ~2.8 ms AllReduce overhead per decode step
 - At TP=8 on H100 HGX: tolerable for batch serving, significant for single-stream latency
 
-### 4.5 AMD MI300X   The Challenger
+### 4.5 AMD MI300X — The Challenger
 
 The MI300X deserves mention as a serious alternative for inference serving:
 
@@ -1136,7 +1121,7 @@ kv_transfer:
   bandwidth: 400Gbps
 ```
 
-### 9.2 SGLang: The Throughput Leader
+### 9.2 SGLang — The Throughput Leader
 
 **GitHub:** [sgl-project/sglang](https://github.com/sgl-project/sglang) | **Stars:** 27,694+ | **License:** Apache 2.0
 
